@@ -44,13 +44,13 @@ public class iSith : MonoBehaviour
 
     private UnityEngine.XR.InputDevice device;
 
-    private GameObject rotationSphere;
-
     private bool rotationMode = false;
 
     private Color32 rotationColor = new Color32(0, 230, 0, 255);
 
-    public LineRenderer rotationLineRenderer;
+    private GameObject chewbacca;
+
+    private GameObject darthVader;
 
     void Start()
     {
@@ -65,9 +65,13 @@ public class iSith : MonoBehaviour
         forceV2 = GameObject.Find("ForceV2");
         forceThreshold = GameObject.Find("ForceThreshold");
         collisionDetector = forceV2.GetComponent<CollisionDetector>();
-        rotationSphere = GameObject.Find("RotationSphere");
-        rotationLineRenderer =
-            new GameObject("Line").AddComponent<LineRenderer>();
+        chewbacca = GameObject.Find("Chewbacca");
+        darthVader = GameObject.Find("DarthVader");
+
+        leftHandController.GetComponent<XRInteractorLineVisual>().lineWidth =
+            0f;
+        rightHandController.GetComponent<XRInteractorLineVisual>().lineWidth =
+            0f;
     }
 
     // Update is called once per frame
@@ -76,7 +80,6 @@ public class iSith : MonoBehaviour
         forceV1.SetActive(false);
         forceV2.SetActive(false);
         forceThreshold.SetActive(false);
-        rotationSphere.SetActive(false);
 
         // register Right Hand
         if (device.role.ToString() != "RightHanded")
@@ -141,7 +144,12 @@ public class iSith : MonoBehaviour
                 selectedObject
             )
             {
-                RotationSphere (leftRayStart, rightRayStart);
+                RotationSphere (
+                    leftRayStart,
+                    leftRayEnd,
+                    rightRayStart,
+                    rightRayEnd
+                );
             }
 
             if (
@@ -177,9 +185,6 @@ public class iSith : MonoBehaviour
 
                     if (distance < 0.2f)
                     {
-                        forceV2.transform.localScale =
-                            new Vector3(0.3f, 0.3f, 0.3f);
-
                         // select collidered object
                         if (selectedObject == null)
                         {
@@ -336,13 +341,55 @@ public class iSith : MonoBehaviour
                 selectedObject.GetComponent<MeshRenderer>();
             selectedObjectRenderer.material.SetColor("_Color", standardColor);
         }
+
+        // workaround reset scale ... not nice...
+        chewbacca.transform.localScale =
+            new Vector3(0.5754f, 1.471564f, 0.48842f);
+        darthVader.transform.localScale =
+            new Vector3(0.6687474f, 1.419323f, 0.48842f);
         collisionDetector.collided = false;
         collisionDetector.collidedObject = null;
 
         selectedObject = null;
     }
 
-    private void RotationSphere(Vector3 leftRayStart, Vector3 rightRayStart)
+    private Vector3[]
+    GetThirdPlanePoint(
+        Vector3 leftRayStart,
+        Vector3 leftRayEnd,
+        Vector3 rightRayStart,
+        Vector3 rightRayEnd,
+        int p
+    )
+    {
+        int pointsOnRay = 100;
+
+        Vector3[] rightRayPoints = new Vector3[pointsOnRay];
+        Vector3[] leftRayPoints = new Vector3[pointsOnRay];
+
+        // store point on ray in arrays
+        for (int i = 0; i < pointsOnRay; i++)
+        {
+            float interpolant = (float) i / (float) pointsOnRay;
+            leftRayPoints[i] =
+                Vector3.Lerp(leftRayStart, leftRayEnd, interpolant);
+            rightRayPoints[i] =
+                Vector3.Lerp(rightRayStart, rightRayEnd, interpolant);
+        }
+
+        Vector3[] res = new Vector3[2];
+        res[0] = leftRayPoints[p];
+        res[1] = rightRayPoints[p];
+
+        return res;
+    }
+
+    private void RotationSphere(
+        Vector3 leftRayStart,
+        Vector3 leftRayEnd,
+        Vector3 rightRayStart,
+        Vector3 rightRayEnd
+    )
     {
         rotationMode = true;
         forceV2.SetActive(false);
@@ -354,15 +401,23 @@ public class iSith : MonoBehaviour
         // create a sphere in the middle of the two between the two rays on index 0
         Vector3 position = Vector3.Lerp(leftRayStart, rightRayStart, 0.5f);
 
-        rotationLineRenderer.startWidth = 0.01f;
-        rotationLineRenderer.positionCount = 2;
-        rotationLineRenderer.SetPosition(0, leftRayStart);
-        rotationLineRenderer.SetPosition(1, rightRayStart);
-        rotationLineRenderer.useWorldSpace = false;
-        rotationSphere.transform.position = position;
+        selectedObject.transform.SetParent(scene.transform, true);
 
-        selectedObject.transform.eulerAngles =
-            rotationLineRenderer.transform.eulerAngles;
-        rotationSphere.SetActive(true);
+        Vector3[] temp =
+            GetThirdPlanePoint(leftRayStart,
+            leftRayEnd,
+            rightRayStart,
+            rightRayEnd,
+            5);
+
+        Vector3 direction = leftRayStart - rightRayStart;
+
+        // selectedObject.transform.rotation =
+        //     Quaternion
+        //         .LookRotation(direction,
+        //         rotationCube.transform.TransformDirection(Vector3.up));
+        selectedObject.transform.rotation =
+            Quaternion
+                .LookRotation(leftRayStart - rightRayStart, Vector3.forward);
     }
 }
